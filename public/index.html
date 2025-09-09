@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Predictor</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #1c1e21; display: flex; justify-content: center; align-items: center; flex-direction: column; min-height: 100vh; margin: 0; padding: 1rem; }
+        .container { background-color: #ffffff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 90%; max-width: 800px; text-align: center; }
+        h1 { color: #0d1117; margin-bottom: 1.5rem; }
+        form { display: flex; justify-content: center; gap: 10px; margin-bottom: 2rem; }
+        input[type="text"] { font-size: 1rem; padding: 0.75rem; border: 1px solid #dddfe2; border-radius: 6px; width: 200px; }
+        button { font-size: 1rem; font-weight: bold; color: #fff; background-color: #007bff; border: none; border-radius: 6px; padding: 0.75rem 1.5rem; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        .results { margin-top: 2rem; }
+        .recommendation { font-size: 1.8rem; font-weight: bold; margin-bottom: 1.5rem; }
+        .error { color: #dc3545; font-weight: bold; }
+        img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 1rem; }
+        .loader { display: none; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stock Price Predictor</h1>
+        <form id="stock-form">
+            <input type="text" id="ticker" name="ticker" placeholder="e.g., AAPL, GOOGL">
+            <button type="submit">Analyze & Predict</button>
+        </form>
+        
+        <div id="results-container"></div>
+        <div class="loader" id="loader">Loading...</div>
+    </div>
+
+    <script>
+        document.getElementById('stock-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const tickerInput = document.getElementById('ticker');
+            const resultsContainer = document.getElementById('results-container');
+            const loader = document.getElementById('loader');
+            const button = this.querySelector('button');
+
+            const ticker = tickerInput.value.trim();
+            if (!ticker) {
+                resultsContainer.innerHTML = `<p class="error">Error: Please enter a stock ticker.</p>`;
+                return;
+            }
+
+            // Provide user feedback
+            resultsContainer.innerHTML = '';
+            loader.style.display = 'block';
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
+
+            try {
+                // Call the Netlify serverless function
+                const response = await fetch('/.netlify/functions/predictor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: ticker })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Display the results
+                resultsContainer.innerHTML = `
+                    <div class="results">
+                        <h2>Results for ${data.ticker}</h2>
+                        <p class="recommendation">Recommendation: <span>${data.recommendation}</span></p>
+                        <img src="data:image/png;base64,${data.plot_url}" alt="Stock Price Chart">
+                    </div>
+                `;
+
+            } catch (error) {
+                resultsContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            } finally {
+                // Restore the form
+                loader.style.display = 'none';
+                button.disabled = false;
+                button.textContent = 'Analyze & Predict';
+            }
+        });
+    </script>
+</body>
+</html>
+
